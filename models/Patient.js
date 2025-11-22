@@ -14,28 +14,28 @@ const patientSchema = new mongoose.Schema(
     },
     age: {
       type: Number,
-      required: [true, "Age is required"],
+      required: false,
       min: 1,
       max: 120,
     },
     bloodGroup: {
       type: String,
       enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
-      required: [true, "Blood group is required"],
+      required: false,
     },
     city: {
       type: String,
-      required: [true, "City is required"],
+      required: false,
       trim: true,
     },
     area: {
       type: String,
-      required: [true, "Area is required"],
+      required: false,
       trim: true,
     },
     phone: {
       type: String,
-      required: [true, "Phone number is required"],
+      required: false,
       trim: true,
     },
     emergencyContact: {

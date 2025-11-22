@@ -58,43 +58,58 @@ exports.register = async (req, res) => {
       role,
     });
 
-    // Create profile based on role
-    let profile;
-    switch (role) {
-      case "patient":
-        profile = await Patient.create({
-          user: user._id,
-          ...profileData,
-        });
-        break;
-      case "donor":
-        profile = await Donor.create({
-          user: user._id,
-          ...profileData,
-        });
-        break;
-      case "hospital":
-        profile = await Hospital.create({
-          user: user._id,
-          ...profileData,
-          availableBloodUnits: [
-            { bloodGroup: "A+", units: 0 },
-            { bloodGroup: "A-", units: 0 },
-            { bloodGroup: "B+", units: 0 },
-            { bloodGroup: "B-", units: 0 },
-            { bloodGroup: "AB+", units: 0 },
-            { bloodGroup: "AB-", units: 0 },
-            { bloodGroup: "O+", units: 0 },
-            { bloodGroup: "O-", units: 0 },
-          ],
-        });
-        break;
-      default:
+    // Create profile based on role. Make profile creation atomic: if it fails,
+    // remove the created user to avoid orphaned users and duplicate-email issues.
+    try {
+      let profile;
+      switch (role) {
+        case "patient":
+          profile = await Patient.create({
+            user: user._id,
+            ...profileData,
+          });
+          break;
+        case "donor":
+          profile = await Donor.create({
+            user: user._id,
+            ...profileData,
+          });
+          break;
+        case "hospital":
+          profile = await Hospital.create({
+            user: user._id,
+            ...profileData,
+            availableBloodUnits: [
+              { bloodGroup: "A+", units: 0 },
+              { bloodGroup: "A-", units: 0 },
+              { bloodGroup: "B+", units: 0 },
+              { bloodGroup: "B-", units: 0 },
+              { bloodGroup: "AB+", units: 0 },
+              { bloodGroup: "AB-", units: 0 },
+              { bloodGroup: "O+", units: 0 },
+              { bloodGroup: "O-", units: 0 },
+            ],
+          });
+          break;
+        default:
+          await User.findByIdAndDelete(user._id);
+          return res.status(400).json({
+            success: false,
+            message: "Invalid role specified",
+          });
+      }
+    } catch (profileError) {
+      // Clean up the created user to avoid partial registration
+      try {
         await User.findByIdAndDelete(user._id);
-        return res.status(400).json({
-          success: false,
-          message: "Invalid role specified",
-        });
+      } catch (cleanupErr) {
+        // log cleanup error but return original profile creation error
+        console.error("Failed to cleanup user after profile error:", cleanupErr);
+      }
+
+      // If this is a Mongoose validation error, return 400 with helpful message
+      const msg = profileError && profileError.message ? profileError.message : "Profile creation failed";
+      return res.status(400).json({ success: false, message: msg });
     }
 
     sendTokenResponse(user, 201, res);
